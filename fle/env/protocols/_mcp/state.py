@@ -1,15 +1,14 @@
 import json
+import os
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from fle.env import FactorioInstance
 from fle.commons.cluster_ips import get_local_container_ips
-from fle.env.gym_env.registry import list_available_environments
 
 from fle.env.protocols._mcp.models import FactorioServer, Recipe, ResourcePatch
 from fle.env.protocols._mcp.repository import FactorioMCPRepository
-import gym
 
 
 class FactorioMCPState:
@@ -36,11 +35,20 @@ class FactorioMCPState:
         self.vcs_repos: Dict[
             int, "FactorioMCPRepository"
         ] = {}  # instance_id -> VCS repo
+        self.gym_env = None
 
+        # Skip gym initialization in remote mode (when FLE_SERVER_HOST is set)
+        # This allows the MCP server to work without local gym/gymnasium dependencies
+        if os.environ.get("FLE_SERVER_HOST"):
+            print("Remote mode: Skipping gym environment initialization", file=__import__('sys').stderr)
+            return
+
+        # Local mode - try to initialize gym environment
         try:
+            from fle.env.gym_env.registry import list_available_environments
+            import gym
+
             env_ids = list_available_environments()
-            # print(f"DEBUG: Available environment IDs: {env_ids}")
-            # print(f"DEBUG: Number of environments found: {len(env_ids)}")
 
             if not env_ids:
                 raise Exception("No environments found")
@@ -52,32 +60,11 @@ class FactorioMCPState:
                     self.gym_env.reset()
                     return
 
-            # print(f"DEBUG: No open environment found, using first available: {env_ids[0]}")
             self.gym_env = gym.make(env_ids[0], run_idx=0)
-
-            # program = await self.create_program_from_policy(
-            #     policy=policy,
-            #     agent_idx=agent_idx,
-            #     reward=reward,
-            #     response=obs_dict["raw_text"],
-            #     error_occurred=info["error_occurred"],
-            #     game_state=output_game_state
-            # )
-            #
-        except IndexError as e:
-            print(f"IndexError in __init__: {e}")
-            print(
-                f"env_ids length: {len(env_ids) if 'env_ids' in locals() else 'Not available'}"
-            )
-            print("Falling back to steel_plate_throughput environment")
-            self.gym_env = gym.make("steel_plate_throughput", run_idx=0)
+            self.gym_env.reset()
         except Exception as e:
-            print(f"Error in __init__: {e}")
-            print(f"Error type: {type(e)}")
-            print("Falling back to steel_plate_throughput environment")
-            self.gym_env = gym.make("steel_plate_throughput", run_idx=0)
-
-        self.gym_env.reset()
+            print(f"Warning: Could not initialize gym environment: {e}", file=__import__('sys').stderr)
+            # In remote mode, this is fine - we don't need gym
 
     def create_factorio_instance(self, instance_id: int) -> FactorioInstance:
         """Create a single Factorio instance"""

@@ -12,9 +12,9 @@ import zipfile
 import importlib.resources as ir
 from platformdirs import user_state_dir
 
-START_RCON_PORT = 27000
+START_RCON_PORT = int(os.environ.get("FLE_RCON_PORT", 27000))
 START_GAME_PORT = 34197
-RCON_PASSWORD = "factorio"
+RCON_PASSWORD = os.environ.get("FLE_RCON_PASSWORD", "factorio")
 
 
 def resolve_state_dir() -> Path:
@@ -111,8 +111,6 @@ class ComposeGenerator:
             "--map-settings /opt/factorio/config/map-settings.json",
             "--server-adminlist /opt/factorio/config/server-adminlist.json",
             "--server-banlist /opt/factorio/config/server-banlist.json",
-            "--server-whitelist /opt/factorio/config/server-whitelist.json",
-            "--use-server-whitelist",
         ]
         if self.scenario == "open_world":
             args.append(f"--map-gen-seed {self.map_gen_seed}")
@@ -190,7 +188,9 @@ class ComposeGenerator:
             raise ValueError(f"Scenarios directory '{scenarios_dir}' does not exist.")
         return {
             "source": str(scenarios_dir.resolve()),
-            "target": "/opt/factorio/scenarios",
+            # Use /factorio/scenarios instead of /opt/factorio/scenarios because
+            # /opt/factorio/scenarios is a symlink which cannot be mounted over
+            "target": "/factorio/scenarios",
             "type": "bind",
         }
 

@@ -1,10 +1,31 @@
 import subprocess
 import json
+import os
 from typing import List
 
 
 def get_local_container_ips() -> tuple[List[str], List[int], List[int]]:
-    """Get IP addresses of running Factorio containers in the local Docker setup."""
+    """Get IP addresses of running Factorio containers.
+
+    If FLE_SERVER_HOST and FLE_RCON_PORT environment variables are set,
+    uses those for remote connection instead of local Docker discovery.
+    """
+    # Check for remote server configuration via environment variables
+    remote_host = os.environ.get("FLE_SERVER_HOST")
+    remote_rcon_port = os.environ.get("FLE_RCON_PORT")
+
+    if remote_host and remote_rcon_port:
+        # Remote mode - use environment variables
+        try:
+            tcp_port = int(remote_rcon_port)
+            # Calculate UDP port from RCON port (UDP = RCON - 27000 + 34197)
+            udp_port = tcp_port - 27000 + 34197
+            return [remote_host], [udp_port], [tcp_port]
+        except ValueError:
+            print(f"Invalid FLE_RCON_PORT: {remote_rcon_port}")
+            return [], [], []
+
+    # Local mode - use Docker discovery
     # Get container IDs for factorio containers
     cmd = ["docker", "ps", "--filter", "name=factorio_", "--format", '"{{.ID}}"']
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -13,7 +34,7 @@ def get_local_container_ips() -> tuple[List[str], List[int], List[int]]:
 
     if not container_ids or container_ids[0] == "":
         print("No running Factorio containers found")
-        return []
+        return [], [], []
 
     ips = []
     udp_ports = []
