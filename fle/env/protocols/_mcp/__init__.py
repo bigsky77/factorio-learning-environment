@@ -7,10 +7,7 @@ from dataclasses import dataclass
 from fastmcp import FastMCP
 
 # Create the MCP server instance FIRST
-mcp = FastMCP(
-    "Factorio Learning Environment",
-    dependencies=["dulwich", "numpy", "pillow"],
-)
+mcp = FastMCP("Factorio Learning Environment")
 
 # Now import other modules that use mcp
 
